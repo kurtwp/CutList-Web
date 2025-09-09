@@ -75,6 +75,8 @@
 <script>
         const BLADE_KERF = 0.125;
         let cutPieces = [];
+        let cutPieces = [];
+        let boards = []; // Make boards accessible to all functions.
 
         function showMessage(message, type) {
             const messageBox = document.getElementById('messageBox');
@@ -315,7 +317,6 @@
                 ctx.fillText(`Board ${i + 1} `, 50, y + stockWidth * scale + 20);
             });
         }
-        
         function exportPDF() {
     const canvas = document.getElementById('diagramCanvas');
     const { jsPDF } = window.jspdf;
@@ -352,76 +353,90 @@
         });
     }
     y += 10;
-
-    // Draw and add each board section individually
-    const boards = window.boards; // Assuming 'boards' is a global variable from optimizeCuts()
-    const boardHeightInMM = 300 * 0.264583; // 300px to mm, for example, based on canvas drawing
-    const pageHeight = doc.internal.pageSize.height;
     
-    boards.forEach((board, i) => {
-        // Create a temporary canvas for each board
+    // Check if there are boards to display before attempting to add them to the PDF
+    if (boards.length === 0) {
+        showMessage("Please optimize cuts first to generate a diagram.", "error");
+        return;
+    }
+    
+    // Iterate through each board and create a separate diagram for each one
+        boards.forEach((board, i) => {
         const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = canvas.width;
-        tempCanvas.height = 300; // This should match the drawing height for a single board
         const tempCtx = tempCanvas.getContext('2d');
+        const boardDiagramHeight = (stockWidth * (canvas.width - 100) / stockLength) + 50; // Calculate height based on scale
         
-        // Redraw only the current board section onto the temporary canvas
-        const scale = (tempCanvas.width - 100) / stockLength;
-        let boardY = 50;
-        
-        // Draw the full stock board rectangle
-        tempCtx.fillStyle = '#A3B18A';
-        tempCtx.fillRect(50, boardY, stockLength * scale, stockWidth * scale);
-        tempCtx.strokeRect(50, boardY, stockLength * scale, stockWidth * scale);
+        tempCanvas.width = canvas.width;
+        tempCanvas.height = boardDiagramHeight + 50; // Add some padding
 
-        let currentY = boardY;
-        board.shelves.forEach(shelf => {
-            let currentX = 50;
-            shelf.pieces.forEach(piece => {
-                const pieceWidth = piece.length * scale;
-                const pieceHeight = piece.width * scale;
-                tempCtx.fillStyle = '#8B4513';
-                tempCtx.fillRect(currentX, currentY, pieceWidth, pieceHeight);
-                tempCtx.fillStyle = '#fff';
-                tempCtx.textAlign = 'center';
-                tempCtx.font = '12px "Inter", sans-serif';
-                tempCtx.fillText(`${piece.length}"x${piece.width}"`, currentX + pieceWidth / 2, currentY + pieceHeight / 2 + 4);
-                currentX += pieceWidth;
-                tempCtx.fillStyle = '#000';
-                tempCtx.fillRect(currentX, currentY, BLADE_KERF * scale, pieceHeight);
-                currentX += BLADE_KERF * scale;
-            });
-            currentY += shelf.height * scale;
-            tempCtx.fillStyle = '#000';
-            tempCtx.fillRect(50, currentY, stockLength * scale, BLADE_KERF * scale);
-            currentY += BLADE_KERF * scale;
-        });
-        
-        const offcutHeight = stockWidth - board.usedHeight;
-        if (offcutHeight > 0) {
-            tempCtx.fillStyle = '#A3B18A';
-            tempCtx.fillRect(50, boardY + board.usedHeight * scale, stockLength * scale, offcutHeight * scale);
-        }
+        // Draw only the current board's diagram on the temporary canvas
+        drawBoardDiagram(tempCtx, 50, 50, stockLength, stockWidth, board, i, (canvas.width - 100) / stockLength);
 
-        tempCtx.fillStyle = '#000';
-        tempCtx.textAlign = 'left';
-        tempCtx.fillText(`Board ${i + 1}`, 50, boardY + stockWidth * scale + 20);
-
-        // Add the board image to the PDF
+        // Convert the temporary canvas to a data URL
         const dataURL = tempCanvas.toDataURL("image/png");
-        const imgWidth = 195.9;
+        const imgWidth = 195.9; // Adjust to fit A4 page width with margins
         const imgHeight = (tempCanvas.height * imgWidth) / tempCanvas.width;
 
-        if (y + imgHeight + 20 > pageHeight) { // Check if there's space for the next board
+        const pageHeight = doc.internal.pageSize.height;
+        if (y + imgHeight + 20 > pageHeight) {
             doc.addPage();
-            y = 20;
+            y = 20; // Reset Y position for the new page
         }
 
         doc.addImage(dataURL, 'PNG', 10, y, imgWidth, imgHeight);
-        y += imgHeight + 10; // Increment y for the next board
+        y += imgHeight + 10; // Move Y down for the next image
     });
 
     doc.save("cutlist_report.pdf");
+}
+
+// Helper function to draw a single board on a given context
+function drawBoardDiagram(ctx, x, y, stockLength, stockWidth, board, i, scale) {
+    // Draw the full stock board rectangle
+    ctx.fillStyle = '#A3B18A';
+    ctx.fillRect(x, y, stockLength * scale, stockWidth * scale);
+    ctx.strokeRect(x, y, stockLength * scale, stockWidth * scale);
+
+    let currentY = y;
+    board.shelves.forEach(shelf => {
+        let currentX = x;
+        shelf.pieces.forEach(piece => {
+            const pieceWidth = piece.length * scale;
+            const pieceHeight = piece.width * scale;
+            ctx.fillStyle = '#8B4513';
+            ctx.fillRect(currentX, currentY, pieceWidth, pieceHeight);
+            
+            ctx.fillStyle = '#fff';
+            ctx.textAlign = 'center';
+            ctx.font = '12px "Inter", sans-serif';
+            ctx.fillText(`${piece.length}"x${piece.width}"`, currentX + pieceWidth / 2, currentY + pieceHeight / 2 + 4);
+            
+            currentX += pieceWidth;
+
+            // Draw the kerf line
+            ctx.fillStyle = '#000';
+            ctx.fillRect(currentX, currentY, BLADE_KERF * scale, pieceHeight);
+            currentX += BLADE_KERF * scale;
+        });
+        
+        currentY += shelf.height * scale;
+
+        // Draw the kerf between shelves
+        ctx.fillStyle = '#000';
+        ctx.fillRect(x, currentY, stockLength * scale, BLADE_KERF * scale);
+        currentY += BLADE_KERF * scale;
+    });
+
+    // Draw the offcut area
+    const offcutHeight = stockWidth - board.usedHeight;
+    if (offcutHeight > 0) {
+        ctx.fillStyle = '#A3B18A';
+        ctx.fillRect(x, y + board.usedHeight * scale, stockLength * scale, offcutHeight * scale);
+    }
+    
+    ctx.fillStyle = '#000';
+    ctx.textAlign = 'left';
+    ctx.fillText(`Board ${i + 1} `, x, y + stockWidth * scale + 20);
 }
         
         // Initial setup and resizing
