@@ -97,8 +97,13 @@
 
         function addPiece() {
             hideMessage();
+            const stockLength = parseFloat(document.getElementById('stockLength').value);
             const stockWidth = parseFloat(document.getElementById('stockWidth').value);
-
+                // Check if stock dimensions are valid before adding a piece
+            if (isNaN(stockLength) || isNaN(stockWidth) || stockLength <= 0 || stockWidth <= 0) {
+                showMessage("Please enter valid stock length and width before adding a piece.", "error");
+                return;
+            }
             const lengthA = parseFloat(document.getElementById('pieceLength').value);
             const widthB = parseFloat(document.getElementById('pieceWidth').value);
             const quantity = parseInt(document.getElementById('quantity').value);
