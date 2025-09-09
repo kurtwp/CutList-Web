@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Wood Cutting Optimizer</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        canvas {
+            touch-action: none;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center p-4 min-h-screen">
+<div class="bg-white p-8 rounded-2xl shadow-lg w-full max-w-3xl">
+<h1 class="text-3xl font-bold text-center text-gray-800 mb-2 md:mb-4">Wood Cutting Optimizer</h1>
+<p class="text-sm text-center text-gray-500 italic mb-4">All cut calculations use a kerf (blade thickness) of 1/8 inch.</p>
+<!-- Message Box -->
+<div class="hidden p-3 mb-4 text-center text-sm font-medium rounded-lg" id="messageBox" role="alert"></div>
+<div class="space-y-6 md:space-y-8">
+<div class="flex flex-col md:flex-row md:items-end space-y-4 md:space-y-0 md:space-x-6">
+<label class="block text-gray-700 font-semibold md:w-1/2" for="stockLength">
+                    Stock Board Length (inches):
+                    <input class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 transition duration-150" id="stockLength" min="1" step="0.01" type="number"/>
+</label>
+<label class="block text-gray-700 font-semibold md:w-1/2" for="stockWidth">
+                    Stock Board Width (inches):
+                    <input class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 transition duration-150" id="stockWidth" min="1" step="0.01" type="number"/>
+</label>
+</div>
+<div class="flex flex-col md:flex-row md:items-end space-y-4 md:space-y-0 md:space-x-6">
+<label class="block text-gray-700 font-semibold md:w-1/4" for="pieceLength">
+                    Piece Length:
+                    <input class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 transition duration-150" id="pieceLength" min="1" step="0.01" type="number"/>
+</label>
+<label class="block text-gray-700 font-semibold md:w-1/4" for="pieceWidth">
+                    Piece Width:
+                    <input class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 transition duration-150" id="pieceWidth" min="1" step="0.01" type="number"/>
+</label>
+<label class="block text-gray-700 font-semibold md:w-1/4" for="quantity">
+                    Quantity:
+                    <input class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 transition duration-150" id="quantity" min="1" step="1" type="number"/>
+</label>
+<div class="flex md:w-1/4 space-x-2">
+<button class="flex-grow px-4 py-2 bg-green-500 text-white font-bold rounded-lg shadow-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 transition duration-150 ease-in-out" onclick="addPiece()">
+                        Add Piece
+                    </button>
+<button class="flex-grow px-4 py-2 bg-red-500 text-white font-bold rounded-lg shadow-md hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-50 transition duration-150 ease-in-out" onclick="clearAll()">
+                        Clear All
+                    </button>
+</div>
+</div>
+<div class="piece-list mt-8">
+<h3 class="text-xl font-bold text-gray-800 mb-2">Cut List</h3>
+<ul class="bg-gray-50 p-4 rounded-lg border border-gray-200 min-h-[5rem] overflow-y-auto" id="cutListDisplay"></ul>
+</div>
+<div class="flex flex-col md:flex-row justify-center md:space-x-4 space-y-4 md:space-y-0">
+<button class="w-full md:w-auto px-6 py-3 bg-blue-600 text-white font-bold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition duration-150 ease-in-out" onclick="optimizeCuts()">
+                    Optimize Cuts
+                </button>
+<button class="w-full md:w-auto px-6 py-3 bg-indigo-600 text-white font-bold rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50 transition duration-150 ease-in-out" onclick="exportPDF()">
+                    Export to PDF
+                </button>
+</div>
+<div class="bg-gray-50 p-4 rounded-lg mt-4 border border-gray-200" id="results"></div>
+<canvas class="w-full max-w-full rounded-lg shadow-md border border-gray-200" id="diagramCanvas"></canvas>
+</div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+        const BLADE_KERF = 0.125;
+        let cutPieces = [];
+
+        function showMessage(message, type) {
+            const messageBox = document.getElementById('messageBox');
+            messageBox.textContent = message;
+            messageBox.className = 'p-3 mb-4 text-center text-sm font-medium rounded-lg ';
+            if (type === 'error') {
+                messageBox.classList.add('bg-red-100', 'text-red-800');
+            } else if (type === 'success') {
+                messageBox.classList.add('bg-green-100', 'text-green-800');
+            }
+            messageBox.classList.remove('hidden');
+        }
+
+        function hideMessage() {
+            const messageBox = document.getElementById('messageBox');
+            messageBox.classList.add('hidden');
+        }
+
+        function addPiece() {
+            hideMessage();
+            const stockWidth = parseFloat(document.getElementById('stockWidth').value);
+
+            const lengthA = parseFloat(document.getElementById('pieceLength').value);
+            const widthB = parseFloat(document.getElementById('pieceWidth').value);
+            const quantity = parseInt(document.getElementById('quantity').value);
+            if (lengthA < widthB) {
+                length = widthB;
+                width = lengthA;
+            } else {
+                length = lengthA;
+                width = widthB;
+            }
+            if (width > stockWidth) {
+                showMessage("Width is wider the Stock Board Width.", "error");
+                return;
+            }
+            if (length > 0 && width > 0 && quantity > 0) {
+                cutPieces.push({ length, width, quantity });
+                updateCutList();
+                document.getElementById('pieceLength').value = '';
+                document.getElementById('pieceWidth').value = '';
+                document.getElementById('quantity').value = '';
+            } else {
+                showMessage("Please enter valid length, width, and quantity.", "error");
+            }
+        }
+
+        function updateCutList() {
+            const list = document.getElementById('cutListDisplay');
+            list.innerHTML = '';
+            cutPieces.forEach(item => {
+                const li = document.createElement('li');
+                li.textContent = `${item.quantity} × ${item.length}" × ${item.width}"`;
+                li.className = 'text-gray-700';
+                list.appendChild(li);
+            });
+        }
+
+        function clearAll() {
+            hideMessage();
+            document.getElementById('stockLength').value = '';
+            document.getElementById('stockWidth').value = '';
+            document.getElementById('pieceLength').value = '';
+            document.getElementById('pieceWidth').value = '';
+            document.getElementById('quantity').value = '';
+            cutPieces = [];
+            updateCutList();
+            document.getElementById('results').innerHTML = '';
+            const canvas = document.getElementById('diagramCanvas');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            showMessage("All fields cleared.", "success");
+        }
+
+        function optimizeCuts() {
+            hideMessage();
+            const stockLength = parseFloat(document.getElementById('stockLength').value);
+            const stockWidth = parseFloat(document.getElementById('stockWidth').value);
+            if (stockLength < stockWidth) {
+                // Checking if Length is larger then Width
+                showMessage("Length should be larger then the Width!", "error");
+                return;
+            }
+            if (isNaN(stockLength) || isNaN(stockWidth) ) {
+                // Checking if Field is Empty
+                showMessage("Please enter stock length, and stock width", "error");
+                return;
+            }
+            if (stockLength <= 0 || stockWidth <= 0 || cutPieces.length === 0) {
+                showMessage("Please enter stock length, width, and add cut pieces.", "error");
+                return;
+            }
+            const allPieces = [];
+            cutPieces.forEach(item => {
+                for (let i = 0; i < item.quantity; i++) {
+                    allPieces.push({ length: item.length, width: item.width });
+                }
+            });
+            allPieces.sort((a, b) => (b.length * b.width) - (a.length * a.width));
+
+            const boards = [];
+            let totalOffcut = 0;
+
+            allPieces.forEach(piece => {
+                let placed = false;
+                for (const board of boards) {
+                    // Try to place piece in existing board
+                    // Simplified shelf-packing algorithm
+                    for (const shelf of board.shelves) {
+                        const canFit = (piece.length + BLADE_KERF <= shelf.remainingLength) && (piece.width + BLADE_KERF <= shelf.height);
+                        const canFitRotated = (piece.width + BLADE_KERF <= shelf.remainingLength) && (piece.length + BLADE_KERF <= shelf.height);
+                        if (canFit) {
+                            shelf.pieces.push(piece);
+                            shelf.remainingLength -= (piece.length + BLADE_KERF);
+                            placed = true;
+                            break;
+                        } else if (canFitRotated) {
+                            shelf.pieces.push({ length: piece.width, width: piece.length });
+                            shelf.remainingLength -= (piece.width + BLADE_KERF);
+                            placed = true;
+                            break;
+                        }
+                    }
+
+                    if (placed) break;
+
+                    // If not placed, try to create a new shelf
+                    const newShelfHeight = piece.width + BLADE_KERF;
+                    const newShelfRemainingHeight = stockWidth - board.usedHeight;
+                    if (newShelfHeight <= newShelfRemainingHeight) {
+                        const newShelf = {
+                            height: newShelfHeight,
+                            remainingLength: stockLength - (piece.length + BLADE_KERF),
+                            pieces: [piece]
+                        };
+                        board.shelves.push(newShelf);
+                        board.usedHeight += newShelfHeight;
+                        placed = true;
+                        break;
+                    }
+                }
+                
+                // If not placed in any existing board, start a new one
+                if (!placed) {
+                    const newBoard = {
+                        usedHeight: piece.width + BLADE_KERF,
+                        shelves: [{
+                            height: piece.width + BLADE_KERF,
+                            remainingLength: stockLength - (piece.length + BLADE_KERF),
+                            pieces: [piece]
+                        }]
+                    };
+                    boards.push(newBoard);
+                }
+            });
+            
+            // Calculate individual board offcuts and total offcut
+            boards.forEach(board => {
+                const usedArea = board.shelves.reduce((area, shelf) => {
+                    const shelfArea = (stockLength - shelf.remainingLength) * shelf.height;
+                    return area + shelfArea;
+                }, 0);
+                const boardArea = stockLength * stockWidth;
+                board.offcut = boardArea - usedArea;
+                totalOffcut += board.offcut;
+            });
+
+
+            document.getElementById('results').innerHTML = `
+                <h3 class="text-xl font-bold text-gray-800">Optimization Results</h3>
+                <p class="text-gray-700 mt-2">Boards Used: <span class="font-semibold">${boards.length}</span></p>
+                <!-- <p class="text-gray-700">Total Waste: <span class="font-semibold">${totalOffcut.toFixed(2)} sq. in.</span></p> -->
+            `;
+
+            drawDiagram(stockLength, stockWidth, boards);
+        }
+
+        function drawDiagram(stockLength, stockWidth, boards) {
+            const canvas = document.getElementById('diagramCanvas');
+            const ctx = canvas.getContext('2d');
+            const container = canvas.parentElement;
+            canvas.width = container.clientWidth;
+            canvas.height = boards.length * (300 + 10) + 100;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            const scale = (canvas.width - 100) / stockLength;
+
+            boards.forEach((board, i) => {
+                let x = 50;
+                let y = 50 + i * (300 + 10);
+
+                // Draw the full stock board rectangle
+                //ctx.fillStyle = '#C2843A'; // Lighter brown for stock
+                ctx.fillStyle = '#A3B18A'; // Lighter brown for stock
+                ctx.fillRect(x, y, stockLength * scale, stockWidth * scale);
+                ctx.strokeRect(x, y, stockLength * scale, stockWidth * scale);
+
+                let currentY = y;
+                board.shelves.forEach(shelf => {
+                    let currentX = x;
+                    shelf.pieces.forEach(piece => {
+                        const pieceWidth = piece.length * scale;
+                        const pieceHeight = piece.width * scale;
+                        ctx.fillStyle = '#8B4513'; // Darker brown for cut pieces
+                        ctx.fillRect(currentX, currentY, pieceWidth, pieceHeight);
+                        
+                        ctx.fillStyle = '#fff';
+                        ctx.textAlign = 'center';
+                        ctx.font = '12px "Inter", sans-serif';
+                        ctx.fillText(`${piece.length}"x${piece.width}"`, currentX + pieceWidth / 2, currentY + pieceHeight / 2 + 4);
+                        
+                        currentX += pieceWidth;
+
+                        // Draw the kerf line
+                        ctx.fillStyle = '#000';
+                        ctx.fillRect(currentX, currentY, BLADE_KERF * scale, pieceHeight);
+                        currentX += BLADE_KERF * scale;
+                    });
+                    
+                    currentY += shelf.height * scale;
+
+                    // Draw the kerf between shelves
+                    ctx.fillStyle = '#000';
+                    ctx.fillRect(x, currentY, stockLength * scale, BLADE_KERF * scale);
+                    currentY += BLADE_KERF * scale;
+                });
+
+                // Draw the offcut area
+                const offcutHeight = stockWidth - board.usedHeight;
+                if (offcutHeight > 0) {
+                    ctx.fillStyle = '#A3B18A';
+                    ctx.fillRect(x, y + board.usedHeight * scale, stockLength * scale, offcutHeight * scale);
+                }
+                
+                ctx.fillStyle = '#000';
+                ctx.textAlign = 'left';
+                //ctx.fillText(`Board ${i + 1} - Waste: ${board.offcut.toFixed(2)} sq. in.`, 50, y + stockWidth * scale + 20)
+                ctx.fillText(`Board ${i + 1} `, 50, y + stockWidth * scale + 20);
+            });
+        }
+        
+        function exportPDF() {
+            const canvas = document.getElementById('diagramCanvas');
+            const dataURL = canvas.toDataURL("image/png");
+
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('p', 'mm', 'a4');
+            let y = 20;
+
+            // Check if there's a diagram to export
+            const hasDiagram = cutPieces.length > 0;
+            if (!hasDiagram) {
+                showMessage("Please optimize cuts first to generate a diagram.", "error");
+                return;
+            }
+
+            // Report Header
+            doc.setFontSize(18);
+            doc.text("Wood Cutting Optimization Report", 10, y);
+            y += 10;
+            
+            // Input Summary
+            doc.setFontSize(12);
+            const stockLength = parseFloat(document.getElementById('stockLength').value);
+            const stockWidth = parseFloat(document.getElementById('stockWidth').value);
+            doc.text(`Stock Board: ${stockLength}" x ${stockWidth}"`, 10, y);
+            y += 10;
+            doc.text("Cut Pieces:", 10, y);
+            y += 10;
+            cutPieces.forEach(item => {
+                doc.text(`${item.quantity} × ${item.length}" × ${item.width}"`, 20, y);
+                y += 7;
+            });
+            y += 5;
+
+            // Optimization results from the UI
+            const resultsDiv = document.getElementById('results');
+            if (resultsDiv) {
+                const resultsText = resultsDiv.innerText;
+                const lines = resultsText.split('\n').filter(line => line.trim() !== '');
+                lines.forEach(line => {
+                    doc.text(line.trim(), 10, y);
+                    y += 7;
+                });
+            }
+            y += 10;
+
+            // Add the diagram from the canvas
+            //const imgWidth = 190; // Adjust to fit A4 page width (210mm) with margins
+            const imgWidth = 195.9; // Adjust to fit A4 page width (210mm) with margins
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            
+            // Check if a new page is needed
+            //if (y + imgHeight > 270) {
+            //if (y + imgHeight > 270) {
+            //    doc.addPage();
+            //    y = 20;
+            //}
+           const bottomMargin = 20;
+           const pageHeight = doc.internal.pageSize.height;
+           if (y + imgHeight + bottomMargin > pageHeight) {
+                    doc.addPage();
+                    y = 20;
+          }
+
+            doc.addImage(dataURL, 'PNG', 10, y, imgWidth, imgHeight);
+            doc.save("cutlist_report.pdf");
+        }
+        
+        // Initial setup and resizing
+        function setupCanvas() {
+            const canvas = document.getElementById('diagramCanvas');
+            const container = canvas.parentElement;
+            canvas.width = container.clientWidth;
+            
+            const stockLength = parseFloat(document.getElementById('stockLength').value);
+            const stockWidth = parseFloat(document.getElementById('stockWidth').value);
+            if (stockLength > 0 && stockWidth > 0 && cutPieces.length > 0) {
+                optimizeCuts();
+            }
+        }
+        
+        window.addEventListener('resize', setupCanvas);
+        window.addEventListener('onload', setupCanvas);
+    </script>
+</body>
+</html>
