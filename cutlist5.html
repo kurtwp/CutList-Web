@@ -94,48 +94,38 @@
             const messageBox = document.getElementById('messageBox');
             messageBox.classList.add('hidden');
         }
-
         function addPiece() {
             hideMessage();
-            const stockLength = parseFloat(document.getElementById('stockLength').value);
             const stockWidth = parseFloat(document.getElementById('stockWidth').value);
         
-            // Initial validation for stock board dimensions
-            if (isNaN(stockLength) || isNaN(stockWidth) || stockLength <= 0 || stockWidth <= 0) {
-                showMessage("Please enter valid stock length and width before adding a piece.", "error");
-                return;
-            }
-        
-            const pieceLength = parseFloat(document.getElementById('pieceLength').value);
-            const pieceWidth = parseFloat(document.getElementById('pieceWidth').value);
+            const lengthA = parseFloat(document.getElementById('pieceLength').value);
+            const widthB = parseFloat(document.getElementById('pieceWidth').value);
             const quantity = parseInt(document.getElementById('quantity').value);
         
-            // Initial validation for piece dimensions and quantity
-            if (isNaN(pieceLength) || isNaN(pieceWidth) || isNaN(quantity) || pieceLength <= 0 || pieceWidth <= 0 || quantity <= 0) {
-                showMessage("Please enter valid length, width, and quantity for the piece.", "error");
-                return;
-            }
-            
             let length, width;
             
-            if (pieceLength < pieceWidth) {
-                length = pieceWidth;
-                width = pieceLength;
+            if (lengthA < widthB) {
+                length = widthB;
+                width = lengthA;
             } else {
-                length = pieceLength;
-                width = pieceWidth;
+                length = lengthA;
+                width = widthB;
             }
         
             if (width > stockWidth) {
-                showMessage("Piece width is wider than the stock board width.", "error");
+                showMessage("Width is wider the Stock Board Width.", "error");
                 return;
             }
         
-            cutPieces.push({ length, width, quantity });
-            updateCutList();
-            document.getElementById('pieceLength').value = '';
-            document.getElementById('pieceWidth').value = '';
-            document.getElementById('quantity').value = '';
+            if (length > 0 && width > 0 && quantity > 0) {
+                cutPieces.push({ length, width, quantity });
+                updateCutList();
+                document.getElementById('pieceLength').value = '';
+                document.getElementById('pieceWidth').value = '';
+                document.getElementById('quantity').value = '';
+            } else {
+                showMessage("Please enter valid length, width, and quantity.", "error");
+            }
         }
 
         function updateCutList() {
