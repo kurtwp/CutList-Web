@@ -102,6 +102,8 @@
             const lengthA = parseFloat(document.getElementById('pieceLength').value);
             const widthB = parseFloat(document.getElementById('pieceWidth').value);
             const quantity = parseInt(document.getElementById('quantity').value);
+            // Declare length and width variables with `let`
+            let length, width;
             if (lengthA < widthB) {
                 length = widthB;
                 width = lengthA;
