@@ -317,72 +317,112 @@
         }
         
         function exportPDF() {
-            const canvas = document.getElementById('diagramCanvas');
-            const dataURL = canvas.toDataURL("image/png");
+    const canvas = document.getElementById('diagramCanvas');
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('p', 'mm', 'a4');
+    let y = 20;
 
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF('p', 'mm', 'a4');
-            let y = 20;
+    // Report Header
+    doc.setFontSize(18);
+    doc.text("Wood Cutting Optimization Report", 10, y);
+    y += 10;
+    
+    // Input Summary
+    doc.setFontSize(12);
+    const stockLength = parseFloat(document.getElementById('stockLength').value);
+    const stockWidth = parseFloat(document.getElementById('stockWidth').value);
+    doc.text(`Stock Board: ${stockLength}" x ${stockWidth}"`, 10, y);
+    y += 10;
+    doc.text("Cut Pieces:", 10, y);
+    y += 10;
+    cutPieces.forEach(item => {
+        doc.text(`${item.quantity} × ${item.length}" × ${item.width}"`, 20, y);
+        y += 7;
+    });
+    y += 5;
 
-            // Check if there's a diagram to export
-            const hasDiagram = cutPieces.length > 0;
-            if (!hasDiagram) {
-                showMessage("Please optimize cuts first to generate a diagram.", "error");
-                return;
-            }
+    // Optimization results from the UI
+    const resultsDiv = document.getElementById('results');
+    if (resultsDiv) {
+        const resultsText = resultsDiv.innerText;
+        const lines = resultsText.split('\n').filter(line => line.trim() !== '');
+        lines.forEach(line => {
+            doc.text(line.trim(), 10, y);
+            y += 7;
+        });
+    }
+    y += 10;
 
-            // Report Header
-            doc.setFontSize(18);
-            doc.text("Wood Cutting Optimization Report", 10, y);
-            y += 10;
-            
-            // Input Summary
-            doc.setFontSize(12);
-            const stockLength = parseFloat(document.getElementById('stockLength').value);
-            const stockWidth = parseFloat(document.getElementById('stockWidth').value);
-            doc.text(`Stock Board: ${stockLength}" x ${stockWidth}"`, 10, y);
-            y += 10;
-            doc.text("Cut Pieces:", 10, y);
-            y += 10;
-            cutPieces.forEach(item => {
-                doc.text(`${item.quantity} × ${item.length}" × ${item.width}"`, 20, y);
-                y += 7;
+    // Draw and add each board section individually
+    const boards = window.boards; // Assuming 'boards' is a global variable from optimizeCuts()
+    const boardHeightInMM = 300 * 0.264583; // 300px to mm, for example, based on canvas drawing
+    const pageHeight = doc.internal.pageSize.height;
+    
+    boards.forEach((board, i) => {
+        // Create a temporary canvas for each board
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = canvas.width;
+        tempCanvas.height = 300; // This should match the drawing height for a single board
+        const tempCtx = tempCanvas.getContext('2d');
+        
+        // Redraw only the current board section onto the temporary canvas
+        const scale = (tempCanvas.width - 100) / stockLength;
+        let boardY = 50;
+        
+        // Draw the full stock board rectangle
+        tempCtx.fillStyle = '#A3B18A';
+        tempCtx.fillRect(50, boardY, stockLength * scale, stockWidth * scale);
+        tempCtx.strokeRect(50, boardY, stockLength * scale, stockWidth * scale);
+
+        let currentY = boardY;
+        board.shelves.forEach(shelf => {
+            let currentX = 50;
+            shelf.pieces.forEach(piece => {
+                const pieceWidth = piece.length * scale;
+                const pieceHeight = piece.width * scale;
+                tempCtx.fillStyle = '#8B4513';
+                tempCtx.fillRect(currentX, currentY, pieceWidth, pieceHeight);
+                tempCtx.fillStyle = '#fff';
+                tempCtx.textAlign = 'center';
+                tempCtx.font = '12px "Inter", sans-serif';
+                tempCtx.fillText(`${piece.length}"x${piece.width}"`, currentX + pieceWidth / 2, currentY + pieceHeight / 2 + 4);
+                currentX += pieceWidth;
+                tempCtx.fillStyle = '#000';
+                tempCtx.fillRect(currentX, currentY, BLADE_KERF * scale, pieceHeight);
+                currentX += BLADE_KERF * scale;
             });
-            y += 5;
-
-            // Optimization results from the UI
-            const resultsDiv = document.getElementById('results');
-            if (resultsDiv) {
-                const resultsText = resultsDiv.innerText;
-                const lines = resultsText.split('\n').filter(line => line.trim() !== '');
-                lines.forEach(line => {
-                    doc.text(line.trim(), 10, y);
-                    y += 7;
-                });
-            }
-            y += 10;
-
-            // Add the diagram from the canvas
-            //const imgWidth = 190; // Adjust to fit A4 page width (210mm) with margins
-            const imgWidth = 195.9; // Adjust to fit A4 page width (210mm) with margins
-            const imgHeight = (canvas.height * imgWidth) / canvas.width;
-            
-            // Check if a new page is needed
-            //if (y + imgHeight > 270) {
-            //if (y + imgHeight > 270) {
-            //    doc.addPage();
-            //    y = 20;
-            //}
-           const bottomMargin = 20;
-           const pageHeight = doc.internal.pageSize.height;
-           if (y + imgHeight + bottomMargin > pageHeight) {
-                    doc.addPage();
-                    y = 20;
-          }
-
-            doc.addImage(dataURL, 'PNG', 10, y, imgWidth, imgHeight);
-            doc.save("cutlist_report.pdf");
+            currentY += shelf.height * scale;
+            tempCtx.fillStyle = '#000';
+            tempCtx.fillRect(50, currentY, stockLength * scale, BLADE_KERF * scale);
+            currentY += BLADE_KERF * scale;
+        });
+        
+        const offcutHeight = stockWidth - board.usedHeight;
+        if (offcutHeight > 0) {
+            tempCtx.fillStyle = '#A3B18A';
+            tempCtx.fillRect(50, boardY + board.usedHeight * scale, stockLength * scale, offcutHeight * scale);
         }
+
+        tempCtx.fillStyle = '#000';
+        tempCtx.textAlign = 'left';
+        tempCtx.fillText(`Board ${i + 1}`, 50, boardY + stockWidth * scale + 20);
+
+        // Add the board image to the PDF
+        const dataURL = tempCanvas.toDataURL("image/png");
+        const imgWidth = 195.9;
+        const imgHeight = (tempCanvas.height * imgWidth) / tempCanvas.width;
+
+        if (y + imgHeight + 20 > pageHeight) { // Check if there's space for the next board
+            doc.addPage();
+            y = 20;
+        }
+
+        doc.addImage(dataURL, 'PNG', 10, y, imgWidth, imgHeight);
+        y += imgHeight + 10; // Increment y for the next board
+    });
+
+    doc.save("cutlist_report.pdf");
+}
         
         // Initial setup and resizing
         function setupCanvas() {
