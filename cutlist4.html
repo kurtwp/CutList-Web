@@ -369,10 +369,16 @@
             
             // Check if a new page is needed
             //if (y + imgHeight > 270) {
-            if (y + imgHeight > 270) {
-                doc.addPage();
-                y = 20;
-            }
+            //if (y + imgHeight > 270) {
+            //    doc.addPage();
+            //    y = 20;
+            //}
+           const bottomMargin = 20;
+           const pageHeight = doc.internal.pageSize.height;
+           if (y + imgHeight + bottomMargin > pageHeight) {
+                    doc.addPage();
+                    y = 20;
+          }
 
             doc.addImage(dataURL, 'PNG', 10, y, imgWidth, imgHeight);
             doc.save("cutlist_report.pdf");
