@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Wood Cutting Optimizer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        canvas {
+            touch-action: none;
+        }
+        .fade-in {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen p-4">
+    <div class="max-w-5xl mx-auto">
+        <div class="bg-white rounded-3xl shadow-xl overflow-hidden">
+            <!-- Header -->
+            <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-8">
+                <h1 class="text-4xl font-bold text-center mb-2">Wood Cutting Optimizer</h1>
+                <p class="text-blue-100 text-center">Minimize waste with optimized cutting patterns • Kerf: 1/8 inch (3.175mm)</p>
+            </div>
+
+            <div class="p-8">
+                <!-- Message Box -->
+                <div class="hidden mb-6 p-4 rounded-lg fade-in" id="messageBox" role="alert">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <span id="messageIcon"></span>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm font-medium" id="messageText"></p>
+                        </div>
+                        <div class="ml-auto pl-3">
+                            <button onclick="hideMessage()" class="inline-flex text-gray-400 hover:text-gray-600 focus:outline-none">
+                                <span class="sr-only">Close</span>
+                                <svg class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="space-y-8">
+                    <!-- Stock Board Input -->
+                    <section class="bg-gradient-to-r from-gray-50 to-gray-100 rounded-2xl p-6 border border-gray-200">
+                        <h2 class="text-xl font-semibold text-gray-800 mb-4">Stock Board Dimensions</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2" for="stockLength">
+                                    Length (inches)
+                                </label>
+                                <input class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200" 
+                                       id="stockLength" 
+                                       type="number" 
+                                       min="1" 
+                                       step="0.25" 
+                                       placeholder="e.g., 96"/>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2" for="stockWidth">
+                                    Width (inches)
+                                </label>
+                                <input class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200" 
+                                       id="stockWidth" 
+                                       type="number" 
+                                       min="1" 
+                                       step="0.25" 
+                                       placeholder="e.g., 24"/>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Piece Input -->
+                    <section class="bg-gradient-to-r from-green-50 to-emerald-100 rounded-2xl p-6 border border-green-200">
+                        <h2 class="text-xl font-semibold text-gray-800 mb-4">Add Cut Pieces</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2" for="pieceLength">
+                                    Length (inches)
+                                </label>
+                                <input class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition duration-200" 
+                                       id="pieceLength" 
+                                       type="number" 
+                                       min="0.25" 
+                                       step="0.25" 
+                                       placeholder="Length"/>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2" for="pieceWidth">
+                                    Width (inches)
+                                </label>
+                                <input class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition duration-200" 
+                                       id="pieceWidth" 
+                                       type="number" 
+                                       min="0.25" 
+                                       step="0.25" 
+                                       placeholder="Width"/>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2" for="quantity">
+                                    Quantity
+                                </label>
+                                <input class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition duration-200" 
+                                       id="quantity" 
+                                       type="number" 
+                                       min="1" 
+                                       step="1" 
+                                       placeholder="Qty"/>
+                            </div>
+                            <div class="flex gap-3">
+                                <button class="flex-1 px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-semibold rounded-lg hover:from-green-600 hover:to-emerald-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition duration-200 transform hover:scale-105" 
+                                        onclick="addPiece()">
+                                    Add Piece
+                                </button>
+                                <button class="flex-1 px-6 py-3 bg-gradient-to-r from-red-500 to-pink-500 text-white font-semibold rounded-lg hover:from-red-600 hover:to-pink-600 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition duration-200 transform hover:scale-105" 
+                                        onclick="clearAll()">
+                                    Clear All
+                                </button>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Cut List -->
+                    <section class="bg-gradient-to-r from-blue-50 to-indigo-100 rounded-2xl p-6 border border-blue-200">
+                        <div class="flex justify-between items-center mb-4">
+                            <h2 class="text-xl font-semibold text-gray-800">Cut List</h2>
+                            <span class="text-sm text-gray-600" id="cutListSummary"></span>
+                        </div>
+                        <div class="bg-white rounded-lg border border-gray-200 min-h-32 max-h-80 overflow-y-auto p-4">
+                            <ul id="cutListDisplay" class="space-y-2"></ul>
+                            <div id="cutListEmpty" class="text-gray-500 italic text-center py-8">
+                                No pieces added yet. Add pieces above to get started.
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Action Buttons -->
+                    <div class="flex flex-col sm:flex-row justify-center gap-4">
+                        <button class="px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-xl shadow-lg hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition duration-200 transform hover:scale-105" 
+                                onclick="optimizeCuts()">
+                            Optimize Cuts
+                        </button>
+                        <button class="px-8 py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold rounded-xl shadow-lg hover:from-purple-700 hover:to-pink-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition duration-200 transform hover:scale-105" 
+                                onclick="exportPDF()">
+                            Export to PDF
+                        </button>
+                    </div>
+
+                    <!-- Results -->
+                    <section id="resultsSection" class="bg-gradient-to-r from-yellow-50 to-orange-100 rounded-2xl p-6 border border-yellow-200 hidden">
+                        <div id="results"></div>
+                    </section>
+
+                    <!-- Diagram -->
+                    <section id="diagramSection" class="bg-white rounded-2xl p-6 border border-gray-200 shadow-inner hidden">
+                        <h2 class="text-xl font-semibold text-gray-800 mb-4">Cutting Diagram</h2>
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <canvas class="w-full rounded-lg border border-gray-300" id="diagramCanvas"></canvas>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script>
+        const BLADE_KERF = 0.125;
+        let cutPieces = [];
+
+        function showMessage(message, type = 'info') {
+            const messageBox = document.getElementById('messageBox');
+            const messageText = document.getElementById('messageText');
+            const messageIcon = document.getElementById('messageIcon');
+            
+            messageText.textContent = message;
+            messageBox.className = 'mb-6 p-4 rounded-lg fade-in';
+            
+            switch(type) {
+                case 'error':
+                    messageBox.classList.add('bg-red-100', 'border', 'border-red-400');
+                    messageText.className = 'text-sm font-medium text-red-800';
+                    messageIcon.textContent = '⚠️';
+                    break;
+                case 'success':
+                    messageBox.classList.add('bg-green-100', 'border', 'border-green-400');
+                    messageText.className = 'text-sm font-medium text-green-800';
+                    messageIcon.textContent = '✅';
+                    break;
+                case 'warning':
+                    messageBox.classList.add('bg-yellow-100', 'border', 'border-yellow-400');
+                    messageText.className = 'text-sm font-medium text-yellow-800';
+                    messageIcon.textContent = '⚠️';
+                    break;
+                default:
+                    messageBox.classList.add('bg-blue-100', 'border', 'border-blue-400');
+                    messageText.className = 'text-sm font-medium text-blue-800';
+                    messageIcon.textContent = 'ℹ️';
+            }
+            
+            messageBox.classList.remove('hidden');
+            
+            if (type === 'success') {
+                setTimeout(hideMessage, 3000);
+            }
+        }
+
+        function hideMessage() {
+            document.getElementById('messageBox').classList.add('hidden');
+        }
+
+        function addPiece() {
+            hideMessage();
+            
+            const stockLength = parseFloat(document.getElementById('stockLength').value) || 0;
+            const stockWidth = parseFloat(document.getElementById('stockWidth').value) || 0;
+            const lengthA = parseFloat(document.getElementById('pieceLength').value) || 0;
+            const widthB = parseFloat(document.getElementById('pieceWidth').value) || 0;
+            const quantity = parseInt(document.getElementById('quantity').value) || 0;
+
+            // Validation
+            if (!stockLength || !stockWidth) {
+                showMessage("Please enter stock board dimensions first.", 'error');
+                return;
+            }
+
+            if (!lengthA || !widthB || !quantity || lengthA <= 0 || widthB <= 0 || quantity <= 0) {
+                showMessage("Please enter valid positive values for length, width, and quantity.", 'error');
+                return;
+            }
+
+            // Auto-orient piece (longer dimension becomes length)
+            let length = Math.max(lengthA, widthB);
+            let width = Math.min(lengthA, widthB);
+
+            // Check if piece fits in stock
+            if (width > stockWidth) {
+                showMessage(`Piece width (${width}") exceeds stock width (${stockWidth}"). Piece cannot fit.`, 'error');
+                return;
+            }
+
+            if (length > stockLength) {
+                showMessage(`Piece length (${length}") exceeds stock length (${stockLength}"). Piece cannot fit.`, 'error');
+                return;
+            }
+
+            // Add to list
+            cutPieces.push({ length, width, quantity });
+            updateCutList();
+            
+            // Clear inputs
+            document.getElementById('pieceLength').value = '';
+            document.getElementById('pieceWidth').value = '';
+            document.getElementById('quantity').value = '';
+            
+            showMessage(`Added ${quantity} piece${quantity > 1 ? 's' : ''} (${length}" × ${width}") to cut list.`, 'success');
+        }
+
+        function updateCutList() {
+            const list = document.getElementById('cutListDisplay');
+            const empty = document.getElementById('cutListEmpty');
+            const summary = document.getElementById('cutListSummary');
+
+            if (cutPieces.length === 0) {
+                list.innerHTML = '';
+                empty.style.display = 'block';
+                summary.textContent = '';
+                return;
+            }
+
+            empty.style.display = 'none';
+            list.innerHTML = '';
+
+            let totalPieces = 0;
+            let totalArea = 0;
+
+            cutPieces.forEach((item, index) => {
+                const li = document.createElement('li');
+                li.className = 'flex items-center justify-between p-3 bg-gray-50 rounded-lg border';
+                
+                const pieceArea = item.length * item.width * item.quantity;
+                totalPieces += item.quantity;
+                totalArea += pieceArea;
+                
+                li.innerHTML = `
+                    <div class="flex items-center space-x-4">
+                        <span class="font-medium text-gray-900">${item.quantity} × ${item.length}" × ${item.width}"</span>
+                        <span class="text-sm text-gray-500">${pieceArea.toFixed(1)} sq in</span>
+                    </div>
+                    <button onclick="removePiece(${index})" 
+                            class="ml-4 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full p-1 transition duration-200"
+                            title="Remove piece">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                `;
+                list.appendChild(li);
+            });
+
+            summary.textContent = `${totalPieces} pieces • ${totalArea.toFixed(1)} sq in total`;
+        }
+
+        function removePiece(index) {
+            const piece = cutPieces[index];
+            cutPieces.splice(index, 1);
+            updateCutList();
+            showMessage(`Removed ${piece.quantity} piece${piece.quantity > 1 ? 's' : ''} (${piece.length}" × ${piece.width}").`, 'success');
+        }
+
+        function clearAll() {
+            hideMessage();
+            document.getElementById('stockLength').value = '';
+            document.getElementById('stockWidth').value = '';
+            document.getElementById('pieceLength').value = '';
+            document.getElementById('pieceWidth').value = '';
+            document.getElementById('quantity').value = '';
+            cutPieces = [];
+            updateCutList();
+            document.getElementById('results').innerHTML = '';
+            document.getElementById('resultsSection').classList.add('hidden');
+            document.getElementById('diagramSection').classList.add('hidden');
+            const canvas = document.getElementById('diagramCanvas');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            showMessage("All data cleared successfully.", 'success');
+        }
+
+        function optimizeCuts() {
+            hideMessage();
+            
+            const stockLength = parseFloat(document.getElementById('stockLength').value) || 0;
+            const stockWidth = parseFloat(document.getElementById('stockWidth').value) || 0;
+
+            if (!stockLength || !stockWidth || stockLength <= 0 || stockWidth <= 0) {
+                showMessage("Please enter valid stock board dimensions.", 'error');
+                return;
+            }
+
+            if (cutPieces.length === 0) {
+                showMessage("Please add some cut pieces before optimizing.", 'error');
+                return;
+            }
+
+            if (stockLength < stockWidth) {
+                showMessage("Consider using length > width for better optimization results.", 'warning');
+            }
+
+            // Create individual pieces array
+            const allPieces = [];
+            cutPieces.forEach(item => {
+                for (let i = 0; i < item.quantity; i++) {
+                    allPieces.push({ 
+                        length: item.length, 
+                        width: item.width,
+                        originalLength: item.length,
+                        originalWidth: item.width
+                    });
+                }
+            });
+
+            // Sort by area (largest first)
+            allPieces.sort((a, b) => (b.length * b.width) - (a.length * a.width));
+
+            const boards = [];
+            let totalWaste = 0;
+
+            // Optimize placement
+            allPieces.forEach(piece => {
+                let placed = false;
+
+                // Try existing boards first
+                for (const board of boards) {
+                    // Try existing shelves
+                    for (const shelf of board.shelves) {
+                        // Normal orientation
+                        if (piece.length + BLADE_KERF <= shelf.remainingLength && 
+                            piece.width <= shelf.height - BLADE_KERF) {
+                            shelf.pieces.push(piece);
+                            shelf.remainingLength -= (piece.length + BLADE_KERF);
+                            placed = true;
+                            break;
+                        }
+                        
+                        // Rotated orientation
+                        if (piece.width + BLADE_KERF <= shelf.remainingLength && 
+                            piece.length <= shelf.height - BLADE_KERF) {
+                            shelf.pieces.push({
+                                length: piece.width,
+                                width: piece.length,
+                                originalLength: piece.originalLength,
+                                originalWidth: piece.originalWidth,
+                                rotated: true
+                            });
+                            shelf.remainingLength -= (piece.width + BLADE_KERF);
+                            placed = true;
+                            break;
+                        }
+                    }
+
+                    if (placed) break;
+
+                    // Try new shelf in existing board
+                    const requiredHeight = piece.width + BLADE_KERF;
+                    const remainingHeight = stockWidth - board.usedHeight;
+                    
+                    if (requiredHeight <= remainingHeight) {
+                        board.shelves.push({
+                            height: requiredHeight,
+                            remainingLength: stockLength - (piece.length + BLADE_KERF),
+                            pieces: [piece]
+                        });
+                        board.usedHeight += requiredHeight;
+                        placed = true;
+                        break;
+                    }
+                }
+
+                // Create new board if needed
+                if (!placed) {
+                    boards.push({
+                        usedHeight: piece.width + BLADE_KERF,
+                        shelves: [{
+                            height: piece.width + BLADE_KERF,
+                            remainingLength: stockLength - (piece.length + BLADE_KERF),
+                            pieces: [piece]
+                        }]
+                    });
+                }
+            });
+
+            // Calculate waste and efficiency
+            const stockArea = stockLength * stockWidth;
+            let totalUsedArea = 0;
+
+            boards.forEach(board => {
+                let boardUsedArea = 0;
+                board.shelves.forEach(shelf => {
+                    const usedLength = stockLength - shelf.remainingLength;
+                    boardUsedArea += usedLength * (shelf.height - BLADE_KERF);
+                });
+                
+                board.wasteArea = stockArea - boardUsedArea;
+                board.efficiency = (boardUsedArea / stockArea) * 100;
+                totalWaste += board.wasteArea;
+                totalUsedArea += boardUsedArea;
+            });
+
+            const overallEfficiency = (totalUsedArea / (boards.length * stockArea)) * 100;
+            const totalMaterialCost = boards.length * stockArea;
+
+            // Display results
+            document.getElementById('results').innerHTML = `
+                <h3 class="text-2xl font-bold text-gray-800 mb-4">Optimization Results</h3>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <div class="bg-blue-100 rounded-lg p-4 text-center">
+                        <div class="text-3xl font-bold text-blue-800">${boards.length}</div>
+                        <div class="text-sm text-blue-600 font-medium">Boards Required</div>
+                    </div>
+                    <div class="bg-green-100 rounded-lg p-4 text-center">
+                        <div class="text-3xl font-bold text-green-800">${overallEfficiency.toFixed(1)}%</div>
+                        <div class="text-sm text-green-600 font-medium">Material Efficiency</div>
+                    </div>
+                    <div class="bg-red-100 rounded-lg p-4 text-center">
+                        <div class="text-3xl font-bold text-red-800">${totalWaste.toFixed(1)}</div>
+                        <div class="text-sm text-red-600 font-medium">Total Waste (sq in)</div>
+                    </div>
+                    <div class="bg-purple-100 rounded-lg p-4 text-center">
+                        <div class="text-3xl font-bold text-purple-800">${totalMaterialCost.toFixed(0)}</div>
+                        <div class="text-sm text-purple-600 font-medium">Material Needed (sq in)</div>
+                    </div>
+                </div>
+                <div class="text-sm text-gray-600 bg-white rounded-lg p-4 border">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <p><strong>Stock per board:</strong> ${stockLength}" × ${stockWidth}"</p>
+                            <p><strong>Area per board:</strong> ${stockArea} sq in</p>
+                        </div>
+                        <div>
+                            <p><strong>Total area used:</strong> ${totalUsedArea.toFixed(1)} sq in</p>
+                            <p><strong>Waste percentage:</strong> ${((totalWaste / totalMaterialCost) * 100).toFixed(1)}%</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('resultsSection').classList.remove('hidden');
+            document.getElementById('diagramSection').classList.remove('hidden');
+            drawDiagram(stockLength, stockWidth, boards);
+            
+            showMessage(`Optimization complete! ${boards.length} boards needed with ${overallEfficiency.toFixed(1)}% efficiency.`, 'success');
+        }
+
+        function drawDiagram(stockLength, stockWidth, boards) {
+            const canvas = document.getElementById('diagramCanvas');
+            const ctx = canvas.getContext('2d');
+            const container = canvas.parentElement;
+
+            // Set canvas dimensions
+            canvas.width = container.clientWidth - 32;
+            const boardHeight = 280;
+            const boardSpacing = 50;
+            canvas.height = boards.length * (boardHeight + boardSpacing) + 50;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const scale = Math.min((canvas.width - 100) / stockLength, 220 / stockWidth);
+            const boardPixelWidth = stockLength * scale;
+            const boardPixelHeight = stockWidth * scale;
+
+            boards.forEach((board, boardIndex) => {
+                const x = (canvas.width - boardPixelWidth) / 2;
+                const y = 30 + boardIndex * (boardHeight + boardSpacing);
+
+                // Draw board background
+                ctx.fillStyle = '#f8fafc';
+                ctx.fillRect(x, y, boardPixelWidth, boardPixelHeight);
+                ctx.strokeStyle = '#334155';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(x, y, boardPixelWidth, boardPixelHeight);
+
+                // Board label
+                ctx.fillStyle = '#1e293b';
+                ctx.font = 'bold 16px Inter';
+                ctx.textAlign = 'left';
+                ctx.fillText(
+                    `Board ${boardIndex + 1} - ${board.efficiency.toFixed(1)}% efficient - Waste: ${board.wasteArea.toFixed(1)} sq in`, 
+                    x, y - 10
+                );
+
+                let currentY = y;
+
+                // Draw shelves and pieces
+                board.shelves.forEach((shelf, shelfIndex) => {
+                    const shelfPixelHeight = shelf.height * scale;
+                    let currentX = x;
+
+                    // Shelf background
+                    ctx.fillStyle = '#e2e8f0';
+                    ctx.fillRect(currentX, currentY, boardPixelWidth, shelfPixelHeight);
+
+                    // Draw pieces
+                    shelf.pieces.forEach((piece, pieceIndex) => {
+                        const piecePixelWidth = piece.length * scale;
+                        const piecePixelHeight = piece.width * scale;
+
+                        // Color coding
+                        const colors = [
+                            '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
+                            '#06b6d4', '#84cc16', '#f97316', '#ec4899', '#6366f1'
+                        ];
+                        ctx.fillStyle = colors[(boardIndex * 3 + pieceIndex) % colors.length];
+                        ctx.fillRect(currentX, currentY, piecePixelWidth, piecePixelHeight);
+
+                        // Piece border
+                        ctx.strokeStyle = '#ffffff';
+                        ctx.lineWidth = 1;
+                        ctx.strokeRect(currentX, currentY, piecePixelWidth, piecePixelHeight);
+
+                        // Piece label
+                        if (piecePixelWidth > 50 && piecePixelHeight > 25) {
+                            ctx.fillStyle = '#ffffff';
+                            ctx.font = 'bold 12px Inter';
+                            ctx.textAlign = 'center';
+                            const label = piece.rotated 
+                                ? `${piece.originalLength}"×${piece.originalWidth}" (R)` 
+                                : `${piece.length}"×${piece.width}"`;
+                            ctx.fillText(label, currentX + piecePixelWidth / 2, currentY + piecePixelHeight / 2 + 4);
+                        }
+
+                        currentX += piecePixelWidth;
+
+                        // Kerf line
+                        if (pieceIndex < shelf.pieces.length - 1 || shelf.remainingLength > BLADE_KERF) {
+                            ctx.fillStyle = '#dc2626';
+                            const kerfPixelWidth = BLADE_KERF * scale;
+                            ctx.fillRect(currentX, currentY, kerfPixelWidth, piecePixelHeight);
+                            currentX += kerfPixelWidth;
+                        }
+                    });
+
+                    currentY += shelfPixelHeight;
+
+                    // Inter-shelf kerf
+                    if (shelfIndex < board.shelves.length - 1) {
+                        ctx.fillStyle = '#dc2626';
+                        const kerfPixelHeight = BLADE_KERF * scale;
+                        ctx.fillRect(x, currentY, boardPixelWidth, kerfPixelHeight);
+                        currentY += kerfPixelHeight;
+                    }
+                });
+
+                // Waste area
+                const wasteHeight = boardPixelHeight - (currentY - y);
+                if (wasteHeight > 0) {
+                    ctx.fillStyle = '#fecaca';
+                    ctx.fillRect(x, currentY, boardPixelWidth, wasteHeight);
+                    
+                    if (wasteHeight > 20) {
+                        ctx.fillStyle = '#7f1d1d';
+                        ctx.font = '12px Inter';
+                        ctx.textAlign = 'center';
+                        ctx.fillText(
+                            `Waste Area: ${board.wasteArea.toFixed(1)} sq in`,
+                            x + boardPixelWidth / 2,
+                            currentY +
